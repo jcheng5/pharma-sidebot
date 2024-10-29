@@ -50,7 +50,6 @@ ui <- page_sidebar(
   sidebar = sidebar(
     width = 400,
     chat_ui("chat", fill = TRUE),
-    open = FALSE
   ),
   tags$head(tags$link(rel = "stylesheet", href = "styles.css")),
   textOutput("show_title", container = h4),
