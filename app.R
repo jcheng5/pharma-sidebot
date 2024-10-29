@@ -35,8 +35,8 @@ anl <- adsl |>
     by = c("STUDYID", "USUBJID")
   ) |>
   dplyr::mutate(
-    TRT01A = factor(TRT01A, levels = c("Placebo", "Xanomeline Low Dose",  "Xanomeline High Dose")),
-    AVAL = AVAL/30.4167
+    TRT01A = factor(TRT01A, levels = c("Placebo", "Xanomeline Low Dose", "Xanomeline High Dose")),
+    AVAL = AVAL / 30.4167
   )
 
 # Open the duckdb database
@@ -54,7 +54,8 @@ ui <- page_sidebar(
   tags$head(tags$link(rel = "stylesheet", href = "styles.css")),
   textOutput("show_title", container = h4),
   verbatimTextOutput("show_query"),
-  layout_columns(fill = FALSE, col_widths = c(5, 7),
+  layout_columns(
+    fill = FALSE, col_widths = c(5, 7),
     value_box("Subjects", textOutput("subjects", inline = TRUE)),
     card(
       tableOutput("subjects_by_arm"),
@@ -92,10 +93,13 @@ server <- function(input, output, session) {
   })
 
   output$subjects_by_arm <- renderTable({
-    df() |> group_by(ARM) |> tally(name = "Shown") |> right_join(
-      by = "ARM",
-      anl |> group_by(ARM) |> tally(name = "Total")
-    )
+    df() |>
+      group_by(ARM) |>
+      tally(name = "Shown") |>
+      right_join(
+        by = "ARM",
+        anl |> group_by(ARM) |> tally(name = "Total")
+      )
   })
 
   output$plot <- renderPlot({
@@ -116,16 +120,19 @@ server <- function(input, output, session) {
       y_label = "Survival Probability (%)",
       x_label = "Time (Months)",
       fun = "pct",
-      legend_position = "bottom" ) |>
+      legend_position = "bottom"
+    ) |>
       visR::add_CNSR() |>
       visR::add_CI()
 
     KM <- KM +
-      ggplot2::theme(axis.text = ggplot2::element_text(size = ggplot2::rel(1.3)),
+      ggplot2::theme(
+        axis.text = ggplot2::element_text(size = ggplot2::rel(1.3)),
         axis.title = ggplot2::element_text(size = ggplot2::rel(1.4)),
         legend.text = ggplot2::element_text(size = ggplot2::rel(1.3)),
-        legend.title = ggplot2::element_text(size = ggplot2::rel(1.4))) +
-      ggplot2::geom_hline(yintercept=0.5, linetype = "dashed")
+        legend.title = ggplot2::element_text(size = ggplot2::rel(1.4))
+      ) +
+      ggplot2::geom_hline(yintercept = 0.5, linetype = "dashed")
 
     # KM <- KM |>
     #   add_risktable2(group = "statlist")
@@ -135,7 +142,7 @@ server <- function(input, output, session) {
         "KM plot for Time to First Dermatologic Event",
         fontfamily = "sans",
         fontface = "bold",
-        size=16
+        size = 16
       )
 
     caption <- cowplot::ggdraw() +
@@ -146,19 +153,24 @@ server <- function(input, output, session) {
           paste0(Sys.time())
         ),
         fontfamily = "sans",
-        size=12
+        size = 12
       )
 
     KM <- cowplot::plot_grid(
       title, KM, caption,
       ncol = 1,
-      rel_heights = c(0.1,0.8,0.1)
+      rel_heights = c(0.1, 0.8, 0.1)
     )
     KM
   })
 
   # ✨ Sidebot ✨ -------------------------------------------------------------
 
+  #' Modifies the data presented in the data dashboard, based on the given SQL
+  #' query, and also updates the title.
+  #' @param query A DuckDB SQL query; must be a SELECT statement.
+  #' @param title A title to display at the top of the data dashboard,
+  #'   summarizing the intent of the SQL query.
   update_dashboard <- function(query, title) {
     if (!is.null(query)) {
       current_query(query)
@@ -169,6 +181,9 @@ server <- function(input, output, session) {
     chat_append("chat", glue::glue("\n\n```sql\n{query}\n```\n\n"))
   }
 
+  #' Perform a SQL query on the data, and return the results as JSON.
+  #' @param query A DuckDB SQL query; must be a SELECT statement.
+  #' @return The results of the query as a JSON string.
   query <- function(query) {
     df <- dbGetQuery(conn, query)
 
