@@ -22,7 +22,7 @@ duplicate_fields <- setdiff(intersect(names(adsl), names(adtte)), c("STUDYID", "
 # Ensure that all duplicate fields are identical
 stopifnot(length(waldo::compare(adsl[duplicate_fields], adtte[duplicate_fields], ignore_attr = TRUE)) == 0)
 
-anl <- adsl |> 
+anl <- adsl |>
   dplyr::filter(
     SAFFL == "Y",
     STUDYID == "CDISCPILOT01"
@@ -68,7 +68,7 @@ ui <- page_sidebar(
 
 server <- function(input, output, session) {
   # 🔄 Reactive state/computation --------------------------------------------
-  
+
   current_title <- reactiveVal(NULL)
   current_query <- reactiveVal("")
 
@@ -79,11 +79,11 @@ server <- function(input, output, session) {
     }
     dbGetQuery(conn, sql)
   })
-  
+
   output$show_title <- renderText({
     current_title()
   })
-  
+
   output$show_query <- renderText({
     current_query()
   })
@@ -98,39 +98,39 @@ server <- function(input, output, session) {
       anl |> group_by(ARM) |> tally(name = "Total")
     )
   })
-  
+
   output$plot <- renderPlot({
     # detect the error
     shiny::validate(
       shiny::need(nrow(df()) > 5, "Not enough observations for this selection. Modify filters and try again.")
     )
- 
+
     ## -----------------------------------------------------------------------------------------------------------------------------------
     # estimate survival
     surv_mod <- visR::estimate_KM(data = df(), strata = "TRT01A")
-    
-    # 
+
+    #
     # # save plot
     ggplot2::theme_set(ggplot2::theme_bw())
-    
+
     KM <- visR::visr(surv_mod,
       y_label = "Survival Probability (%)",
-      x_label = "Time (Months)", 
+      x_label = "Time (Months)",
       fun = "pct",
       legend_position = "bottom" ) |>
       visR::add_CNSR() |>
-      visR::add_CI() 
-    
+      visR::add_CI()
+
     KM <- KM +
       ggplot2::theme(axis.text = ggplot2::element_text(size = ggplot2::rel(1.3)),
         axis.title = ggplot2::element_text(size = ggplot2::rel(1.4)),
         legend.text = ggplot2::element_text(size = ggplot2::rel(1.3)),
         legend.title = ggplot2::element_text(size = ggplot2::rel(1.4))) +
       ggplot2::geom_hline(yintercept=0.5, linetype = "dashed")
-    
+
     # KM <- KM |>
     #   add_risktable2(group = "statlist")
-    
+
     title <- cowplot::ggdraw() +
       cowplot::draw_label(
         "KM plot for Time to First Dermatologic Event",
@@ -138,7 +138,7 @@ server <- function(input, output, session) {
         fontface = "bold",
         size=16
       )
-    
+
     caption <- cowplot::ggdraw() +
       cowplot::draw_label(
         paste(
@@ -149,17 +149,17 @@ server <- function(input, output, session) {
         fontfamily = "sans",
         size=12
       )
-    
+
     KM <- cowplot::plot_grid(
       title, KM, caption,
       ncol = 1,
       rel_heights = c(0.1,0.8,0.1)
     )
-    KM   
+    KM
   })
-  
+
   # ✨ Sidebot ✨ -------------------------------------------------------------
-  
+
   update_dashboard <- function(query, title) {
     if (!is.null(query)) {
       current_query(query)
@@ -169,56 +169,38 @@ server <- function(input, output, session) {
     }
     chat_append("chat", glue::glue("\n\n```sql\n{query}\n```\n\n"))
   }
-  
+
   query <- function(query) {
     df <- dbGetQuery(conn, query)
-    
+
     code <- glue::glue("\n\n```sql\n{query}\n```\n\n")
     tbl_html <- df_to_html(df, maxrows = 5)
-    
+
     chat_append("chat", paste0(code, tbl_html, "\n\n"))
-    
+
     df |> jsonlite::toJSON(auto_unbox = TRUE)
   }
-  
+
   prompt <- system_prompt(anl, "anl")
 
   chat <- chat_openai(model = "gpt-4o", system_prompt = prompt)
-  chat$register_tool(ToolDef(
+  chat$register_tool(tool(
     update_dashboard,
-    name = "update_dashboard",
-    description = "Modifies the data presented in the data dashboard, based on the given SQL query, and also updates the title.",
-    arguments = list(
-      query = ToolArg(
-        type = "string",
-        description = "A DuckDB SQL query; must be a SELECT statement.",
-        required = TRUE
-      ),
-      title = ToolArg(
-        type = "string",
-        description = "A title to display at the top of the data dashboard, summarizing the intent of the SQL query.",
-        required = TRUE
-      )
-    )
+    "Modifies the data presented in the data dashboard, based on the given SQL query, and also updates the title.",
+    query = type_string("A DuckDB SQL query; must be a SELECT statement."),
+    title = type_string("A title to display at the top of the data dashboard, summarizing the intent of the SQL query.")
   ))
-  chat$register_tool(ToolDef(
+  chat$register_tool(tool(
     query,
-    name = "query",
-    description = "Perform a SQL query on the data, and return the results as JSON.",
-    arguments = list(
-      query = ToolArg(
-        type = "string",
-        description = "A DuckDB SQL query; must be a SELECT statement.",
-        required = TRUE
-      )
-    )
+    "Perform a SQL query on the data, and return the results as JSON.",
+    query = type_string("A DuckDB SQL query; must be a SELECT statement.")
   ))
-  
+
   observeEvent(input$chat_user_input, {
     stream <- chat$stream_async(input$chat_user_input)
     chat_append("chat", stream)
   })
-  
+
   chat_append_message("chat", list(role = "assistant", content = greeting))
 }
 
@@ -230,7 +212,7 @@ df_to_html <- function(df, maxrows = 5) {
       xtable::xtable() |>
       print(type = "html", include.rownames = FALSE, html.table.attributes = NULL)
   ) |> paste(collapse = "\n")
-  
+
   if (nrow(df_short) != nrow(df)) {
     rows_notice <- glue::glue("\n\n(Showing only the first {maxrows} rows out of {nrow(df)}.)\n")
   } else {
